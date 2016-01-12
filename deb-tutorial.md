@@ -14,11 +14,11 @@ Adding the port mapping (`-p 8080:8080`) in the above command allows us to brows
 
 The first few steps take you through building a package from source.  First let's examine the sample source package in the directory `/root/src`.
 
-    # cd /root/src     
-    # tree hello-world_1.0.0/  
+    # cd /root/src/hello-world    
+    # tree 
     
 ```
-hello-world_1.0.0/
+.
 |-- debian
 |   |-- README
 |   |-- changelog
@@ -35,17 +35,27 @@ hello-world_1.0.0/
 `-- hello-world
 ```
 
-The stuff in the debian directory is all about building the package.  The `hello-world` shell script is what will actually be installed.
+The stuff in the debian directory is all about building the package.  The `hello-world` shell script is what will actually be installed.  In this directory we can now build the Debian package as follows:
     
-    # cd hello-world_1.0.0/
     # dpkg-buildpackage
     
 The man page will tell you what `dpkg-buildpackage` does exactly but note that one of the steps is to call `debian/rules`.  The [rules](http://www.debian.org/doc/manuals/maint-guide/dreq.en.html#rules) file is actually a Makefile.  The rules file uses the tool `dh` (part of the `debhelper` tool suite).
 
+The `.deb` file should now exist in the directory above the root of the source package.
+
+```
+# ls -1 ../hello-world_*
+../hello-world_1.0.0.dsc
+../hello-world_1.0.0.tar.gz
+../hello-world_1.0.0_all.deb
+../hello-world_1.0.0_amd64.changes
+```
 
 ##Setting up your own Debian Repo
 
-The next few steps serve as a quick primer on using Aptly and working with Debian package repositories.  
+Now we have a package, we would like to deploy it to a repo and then install it from this repo.
+
+The next few steps serve as a quick primer on using Aptly for this purpose.
 
 First we use Aptly to create our repo.
     
@@ -71,9 +81,141 @@ We are now ready to update the apt-get index and then install the package from o
 
     # apt-get update && apt-get install hello-world    
     # hello-world 
-    Hello world!
+    Hello there!
     
+Releasing a New Version
+======================
+    
+First let's make a change to the hello-world shell script; for example:
 
+```bash
+#!/bin/sh
+
+echo "Hello there 2!"
+```
+
+    
+Update the file `debian\changelog`.  There is a tool for doing this `dch`.  For example, to release a version 2.0.0:    
+
+    # dch -v 2.0.0
+    
+Following the changelog update, we need to rebuild the package:
+
+    # cd /root/src/hello-world    
+    # dpkg-buildpackage
+    
+This will build the new version of the `.deb` package which we will now add to the repo as follows:
+
+    # aptly repo add acme /root/src/hello-world_2.0.0_all.deb
+    
+Aptly now requires us to re-publish or update the repo.
+
+    # aptly -architectures=amd64 publish update --skip-signing=true testing
+    
+We can now do an `apt-get update` and then check using `apt-get install -s` to just see whether it thinks there is actually a new version of `hello-world` to upgrade to.  The `-s` means that only a simulation is done; no action is taken but it prints out what would happen if you removed the `-s`:
+
+```
+# apt-get update && apt-get install -s hello-world
+Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+The following packages will be upgraded:
+  hello-world
+1 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
+Inst hello-world [1.0.0] (2.0.0 . testing:testing [all])
+Conf hello-world (2.0.0 . testing:testing [all])
+```
+
+We can see from this that there is a version 2.0.0 to upgrade to. Now we can do the version upgrade for real and watch what happens:
+
+```
+# apt-get install hello-world
+Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+The following packages will be upgraded:
+  hello-world
+1 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
+Need to get 3844 B of archives.
+After this operation, 0 B of additional disk space will be used.
+WARNING: The following packages cannot be authenticated!
+  hello-world
+Install these packages without verification? [y/N] y
+Get:1 http://localhost:8080/ testing/main hello-world all 2.0.0 [3844 B]
+Fetched 3844 B in 0s (0 B/s)    
+(Reading database ... 24813 files and directories currently installed.)
+Preparing to unpack .../hello-world_2.0.0_all.deb ...
+Unpacking hello-world (2.0.0) over (1.0.0) ...
+Processing triggers for man-db (2.6.7.1-1ubuntu1) ...
+Setting up hello-world (2.0.0) ...
+```
+
+Prove to ourselves that the upgrade happened:
+
+    # hello-world 
+    Hello there 2!
+
+Oops!  We made a terrible mistake and want to *downgrade* back to version 1.0.0.  Well first we can validate what versions there are available using `apt-cache`:
+
+```
+# apt-cache showpkg hello-world
+Package: hello-world
+Versions: 
+2.0.0 (/var/lib/apt/lists/localhost:8080_dists_testing_main_binary-amd64_Packages.gz) (/var/lib/dpkg/status)
+ Description Language: 
+                 File: /var/lib/apt/lists/localhost:8080_dists_testing_main_binary-amd64_Packages.gz
+                  MD5: 9b7c7112ac3c351a6af7df35a47c3514
+
+1.0.0 (/var/lib/apt/lists/localhost:8080_dists_testing_main_binary-amd64_Packages.gz)
+ Description Language: 
+                 File: /var/lib/apt/lists/localhost:8080_dists_testing_main_binary-amd64_Packages.gz
+                  MD5: 9b7c7112ac3c351a6af7df35a47c3514
+
+
+Reverse Depends: 
+Dependencies: 
+2.0.0 - 
+1.0.0 - 
+Provides: 
+2.0.0 - 
+1.0.0 - 
+Reverse Provides: 
+```    
+
+We are now sure we want to revert back to version 1.0.0.  We do this using `apt-get install <pkg>=version` as follows:
+     
+    
+```
+# sudo apt-get install hello-world=1.0.0
+Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+The following packages will be DOWNGRADED:
+  hello-world
+0 upgraded, 0 newly installed, 1 downgraded, 0 to remove and 5 not upgraded.
+Need to get 3780 B of archives.
+After this operation, 0 B of additional disk space will be used.
+Do you want to continue? [Y/n] 
+WARNING: The following packages cannot be authenticated!
+  hello-world
+Install these packages without verification? [y/N] y
+Get:1 http://localhost:8080/ testing/main hello-world all 1.0.0 [3780 B]
+Fetched 3780 B in 0s (0 B/s)    
+dpkg: warning: downgrading hello-world from 2.0.0 to 1.0.0
+(Reading database ... 24813 files and directories currently installed.)
+Preparing to unpack .../hello-world_1.0.0_all.deb ...
+Unpacking hello-world (1.0.0) over (2.0.0) ...
+Processing triggers for man-db (2.6.7.1-1ubuntu1) ...
+Setting up hello-world (1.0.0) ...
+```
+
+Finally, we validate that the down-grade worked as expected.
+
+    # hello-world 
+    Hello there!
+
+
+    
 Details of what we did
 ======================
 
