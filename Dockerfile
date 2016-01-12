@@ -5,7 +5,7 @@ MAINTAINER Art
 RUN echo "deb http://repo.aptly.info/ squeeze main" >> /etc/apt/sources.list && \
     apt-key adv --keyserver keys.gnupg.net --recv-keys E083A3782A194991 && \
     apt-get update && \
-    apt-get install -y aptly
+    apt-get install -y aptly 
 # Install typical pre-requisites for debian package builds
 RUN apt-get update && apt-get install -y \ 
     build-essential \
@@ -28,5 +28,6 @@ RUN apt-get update && apt-get install -y \
     python \
     quilt \
     curl \
-    wget
-
+    wget \
+    tree
+ADD src /root/src

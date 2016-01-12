@@ -1,94 +1,149 @@
-Building a Debian Package
+Debian Packaging Tutorial
 =========================
 
-This walk-through uses a Dockerfile based on `ubuntu:trusty`.  This is installed with everything you need to build the debian package in the example.
+This very quick walk-through borrows from the "Hello World" build example published [here](https://wiki.debian.org/BuildingTutorial#Introduction).
 
-    $ docker build -t deb-build . 
-    $ docker run -ti deb-build bash
+We employ a Dockerfile based on `ubuntu:trusty`.  This is pre-installed with everything you need to; build the sample Debian package, create an [Aptly](http://www.aptly.info/) repo, deploy the package to the repo, and install it from the repo.
 
-The following structure corresponds to the "Hello World" build example presented [here](https://wiki.debian.org/BuildingTutorial#Introduction).
+    # docker build -t deb-build . 
+    # docker run -ti -p 8080:8080 deb-build bash
 
-First, this example takes you through the typical process of getting hold of the source package and unpacking the source.
+Adding the port mapping (`-p 8080:8080`) in the above command allows us to browse the aptly repo we will set up later.
 
-    # wget http://wiki.opf-labs.org/download/attachments/12059958/hello.tar.gz
-    
-    # tar xvzf hello.tar.gz 
-    
-    # tree hello    
+##Building the Package
+
+The first few steps take you through building a package from source.  First let's examine the sample source package in the directory `/root/src`.
+
+    # cd /root/src     
+    # tree hello-world_1.0.0/  
     
 ```
-hello/
-`-- hello-world_1.0.0
-    |-- debian
-    |   |-- README
-    |   |-- changelog
-    |   |-- compat
-    |   |-- control
-    |   |-- copyright
-    |   |-- dirs
-    |   |-- hello-world.manpages
-    |   |-- hello-world.pod
-    |   |-- install
-    |   |-- rules
-    |   `-- source
-    |       `-- format
-    `-- hello-world
-
-3 directories, 12 files
+hello-world_1.0.0/
+|-- debian
+|   |-- README
+|   |-- changelog
+|   |-- compat
+|   |-- control
+|   |-- copyright
+|   |-- dirs
+|   |-- hello-world.manpages
+|   |-- hello-world.pod
+|   |-- install
+|   |-- rules
+|   `-- source
+|       `-- format
+`-- hello-world
 ```
-The top directory, by convention is the package name, in this case `hello`.
 
 The stuff in the debian directory is all about building the package.  The `hello-world` shell script is what will actually be installed.
     
-    # cd hello/hello-world_1.0.0/
+    # cd hello-world_1.0.0/
     # dpkg-buildpackage
     
 The man page will tell you what `dpkg-buildpackage` does exactly but note that one of the steps is to call `debian/rules`.  The [rules](http://www.debian.org/doc/manuals/maint-guide/dreq.en.html#rules) file is actually a Makefile.  The rules file uses the tool `dh` (part of the `debhelper` tool suite).
 
 
-Setting up a debian repo
-=======================
+##Setting up your own Debian Repo
 
-This section serves as a quick primer on using Aptly and working with debian package repositories.  This Docker image 
-is also installed with Aptly so you have everything necessary to create a local repo for general instruction and testing purposes.
+The next few steps serve as a quick primer on using Aptly and working with Debian package repositories.  
 
-We can run a conatiner with port mapping so that we will be able to access Aptly's repo server from outside the Docker container.
-
-    $ docker run -ti -p 8080:8080 deb-build bash
-
-Now we can use Aptly to create a repo.
+First we use Aptly to create our repo.
     
-    $ aptly repo create -distribution=test -component=main acme-test
-
-You can now list the repo you created.
+    # aptly repo create -distribution=testing -component=main acme
     
-    $ aptly repo list
+We can now add the package we just built into the local repo.
+
+    # aptly repo add acme /root/src/hello-world_1.0.0_all.deb        
+
+We need tp publish the repo we created.
+
+    # aptly -architectures=amd64 publish repo --skip-signing=true acme
+
+We can now tell Aptly to act as a server for this repo; the default port is `8080`.
     
-    List of local repos:
-    * [acme-test] (packages: 0)
+    # aptly serve &    
 
-    To get more information about local repository, run `aptly repo show <name>`.
+The new Aptly repo must be added to your list of sources so that `apt-get` will be able to search it for our new package.
 
-To see the configuration:
+    # echo "deb http://localhost:8080/ testing main" >> /etc/apt/sources.list  
+
+We are now ready to update the apt-get index and then install the package from our aptly repo.
+
+    # apt-get update && apt-get install hello-world    
+    # hello-world 
+    Hello world!
+    
+
+Details of what we did
+======================
+
+Inspect the repo you created.
+
+```    
+# aptly repo list
+List of local repos:
+ * [acme] (packages: 1)
+
+To get more information about local repository, run `aptly repo show <name>`.
+```
+
+See how aptly stores the local repo configuration:
     
     $ cat  ~/.aptly.conf 
     
-We have to publish the repo we created (by default aptly publishes to the local file system for testing purposes)
-    
-    $ aptly -architectures=amd64 publish repo --skip-signing=true acme-test
-    
-In the example we have used the option `--skip-signing=true` which we wouldn't normally want to do.  Also note that we need to specify the architecture; for example, we could determine our target architecture like this:
+When we published,  we used the option `--skip-signing=true` which we wouldn't normally want to do.  Also note that we need to specify the architecture; for example, we could determine our target architecture like this:
 
-    $ dpkg --print-architecture
-    amd64    
+    # dpkg --print-architecture
+    amd64        
+    
+By default aptly publishes to the local file system for testing purposes.
+        
+```
+# tree ~/.aptly
+/root/.aptly
+|-- db
+|   |-- 000002.ldb
+|   |-- 000005.ldb
+|   |-- 000010.ldb
+|   |-- 000011.log
+|   |-- CURRENT
+|   |-- LOCK
+|   |-- LOG
+|   |-- LOG.old
+|   `-- MANIFEST-000012
+|-- pool
+|   `-- be
+|       `-- 7c
+|           `-- hello-world_1.0.0_all.deb
+`-- public
+    |-- dists
+    |   `-- test
+    |       |-- Release
+    |       `-- main
+    |           `-- binary-amd64
+    |               |-- Packages
+    |               |-- Packages.bz2
+    |               |-- Packages.gz
+    |               `-- Release
+    `-- pool
+        `-- main
+            `-- h
+                `-- hello-world
+                    `-- hello-world_1.0.0_all.deb
+```
+    
+Test that Aptly's local embedded server is available from the Docker host:
+    
+    # curl http://localhost:8080/    
+    <pre>
+    <a href="pool/">pool/</a>
+    <a href="dists/">dists/</a>
+    </pre>    
 
-Aptly can now serve the locally published repo over it's embedded web server.
+For outside the Docker container, you may use the mapped port to access your repo server.
+
+    # curl http://192.168.99.100:8080/
     
-    $ aptly serve
+The IP address will depend on the IP of your Docker host.    
     
-The default port is `8080`.  Now you can test that Aptly's local embedded server is available from the Docker host:
-    
-    $ curl http://192.168.99.100:8080/    
-    
-    
-    
+
