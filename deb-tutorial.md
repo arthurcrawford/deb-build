@@ -19,7 +19,7 @@ Adding the port mapping (`-p 8080:8080`) in the above command is optional - it a
 
 The first few steps take you through building a package from source.  First let's examine the sample source package in the directory `/root/src`.
 
-    # cd /root/src/hello-world    
+    # cd /root/src/package-a    
     # tree 
     
 ```
@@ -31,16 +31,16 @@ The first few steps take you through building a package from source.  First let'
 |   |-- control
 |   |-- copyright
 |   |-- dirs
-|   |-- hello-world.manpages
-|   |-- hello-world.pod
+|   |-- package-a.manpages
+|   |-- package-a.pod
 |   |-- install
 |   |-- rules
 |   `-- source
 |       `-- format
-`-- hello-world
+`-- package-a
 ```
 
-The stuff in the debian directory is all about building the package.  The `hello-world` shell script is what will actually be installed.  In this directory we can now build the Debian package as follows:
+The stuff in the debian directory is all about building the package.  The `package-a` shell script is what will actually be installed.  In this directory we can now build the Debian package as follows:
     
     # dpkg-buildpackage
     
@@ -49,11 +49,11 @@ The man page will tell you what `dpkg-buildpackage` does exactly but note that o
 The `.deb` file should now exist in the directory above the root of the source package.
 
 ```
-# ls -1 ../hello-world_*
-../hello-world_1.0.0.dsc
-../hello-world_1.0.0.tar.gz
-../hello-world_1.0.0_all.deb
-../hello-world_1.0.0_amd64.changes
+# ls -1 ../package-a_*
+../package-a_1.0.0.dsc
+../package-a_1.0.0.tar.gz
+../package-a_1.0.0_all.deb
+../package-a_1.0.0_amd64.changes
 ```
 
 ##Setting up your own Debian Repo
@@ -64,29 +64,57 @@ The next few steps serve as a quick primer on using Aptly for this purpose.
 
 First we use Aptly to create our repo.
     
-    # aptly repo create -distribution=testing -component=main acme
+    # aptly repo create -distribution=testing -component=main a4pizza-testing
     
-We can now add the package we just built into the local repo.
+Note that the repo, itself is called "a4pizza-testing".  The distribution, however, is called "testing".  There may be other distributions such as "unstable" and "stable" - these would set up in the same way with another Aptly repo (note that in APT terms, however, several distributions such as "testing", "unstable" and "stable" would be considered distributions under the same *APT* repo.  Under the "testing" distribution there is just the single component called "main".
+    
+We can now add the package we just built into the Aptly repo.
 
-    # aptly repo add acme /root/src/hello-world_1.0.0_all.deb        
+    # aptly repo add a4pizza-testing /root/src/package-a_1.0.0_all.deb        
 
-We need tp publish the repo we created.
+And then we need to publish the repo we created.
 
-    # aptly -architectures=amd64 publish repo --skip-signing=true acme
+    # aptly -architectures=all,amd64 publish repo --skip-signing=true a4pizza-testing
 
 We can now tell Aptly to act as a server for this repo; the default port is `8080`.
     
     # aptly serve &    
 
-The new Aptly repo must be added to your list of sources so that `apt-get` will be able to search it for our new package.
+The new Aptly repo must be added to your list of sources so that `apt` will be able to search it for our new package.
 
-    # echo "deb http://localhost:8080/ testing main" >> /etc/apt/sources.list  
+    # echo "deb http://localhost:8080/ testing main" >> /etc/apt/sources.list
+    
+Importantly, note that we're using the distribution name "testing" here.       
 
-We are now ready to update the apt-get index and then install the package from our aptly repo.
+We are now ready to update the `apt` index and then install the package using `apt`.
 
-    # apt-get update && apt-get install hello-world    
-    # hello-world 
-    Hello there!
+    # apt update && apt install package-a    
+    # package-a 
+    Hello from package-a!
+    
+###Removing the package from the repo
+
+First make sure package is uninstalled
+
+    # apt remove package-a
+    
+Then remove from the Aptly repo and re-publish.
+
+    # aptly repo remove a4pizza-testing package-a    
+    # aptly -architectures=all,amd64 publish update --skip-signing testing
+    
+Then we update the `apt` cache.
+    
+    # apt update 
+
+We should now find that the package is gone from the repo.
+
+    # apt install package-a
+    Reading package lists... Done
+    Building dependency tree       
+    Reading state information... Done
+    E: Unable to locate package package-a
+    
     
 Releasing a New Version
 ======================
@@ -95,7 +123,6 @@ First let's make a change to the hello-world shell script; for example:
 
 ```bash
 #!/bin/sh
-
 echo "Hello there 2!"
 ```
 

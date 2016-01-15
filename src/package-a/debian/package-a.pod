@@ -1,10 +1,10 @@
 =head1 NAME
 
-package-b - Sample package - a script that prints a message.
+package-a - Sample package - a script that prints a message.
 
 =head1 SYNOPSIS
 
-package-b 
+package-a 
 
 =head1 DESCRIPTION
 
@@ -12,7 +12,7 @@ package-b
 
 =head1 AUTHORS
 
-B<package-b> was written by Art Crawford <art@a4pizza.com>.
+B<package-a> was written by Art Crawford <art@a4pizza.com>.
 
 This manual page was written by Art Crawford <art@a4pizza.com>. 
 =cut

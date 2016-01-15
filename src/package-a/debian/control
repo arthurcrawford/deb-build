@@ -1,0 +1,13 @@
+Source: package-a
+Section: misc
+Priority: extra
+Maintainer: Art Crawford <art@a4pizza.com>
+Build-Depends: debhelper (>= 8.0.0), perl
+Standards-Version: 3.9.2
+Homepage: http://www.a4pizza.com/
+
+Package: package-a
+Architecture: all 
+Depends: ${misc:Depends}
+Description: Sample package to illustrate deb build process 
+ Prints out a test message.
