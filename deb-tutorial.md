@@ -6,9 +6,14 @@ This very quick walk-through borrows from the "Hello World" build example publis
 We employ a Dockerfile based on `ubuntu:trusty`.  This is pre-installed with everything you need to; build the sample Debian package, create an [Aptly](http://www.aptly.info/) repo, deploy the package to the repo, and install it from the repo.
 
     # docker build -t deb-build . 
-    # docker run -ti -p 8080:8080 deb-build bash
+    
+To run a container    
+    
+    # docker run -ti \
+        -p 8080:8080 \
+        bash
 
-Adding the port mapping (`-p 8080:8080`) in the above command allows us to browse the aptly repo we will set up later.
+Adding the port mapping (`-p 8080:8080`) in the above command is optional - it allows us to browse the aptly repo we will set up later.  
 
 ##Building the Package
 
@@ -214,10 +219,13 @@ Finally, we validate that the down-grade worked as expected.
     # hello-world 
     Hello there!
 
+#A Simple Release Lifecycle
+
+This section outlines how the tools used above may also be used to implement a simple build/release lifecycle whereby changes merged into an integration repository are promoted to a release when they have been tested.
 
     
-Details of what we did
-======================
+Details 
+========
 
 Inspect the repo you created.
 
