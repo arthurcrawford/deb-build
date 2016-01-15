@@ -1,2 +1,4 @@
 #!/bin/sh
 echo "Hello from package-b!"
+# And here is a dependency on package-a
+package-a

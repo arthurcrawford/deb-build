@@ -8,6 +8,6 @@ Homepage: http://www.a4pizza.com/
 
 Package: package-b
 Architecture: all 
-Depends: ${misc:Depends}
+Depends: ${misc:Depends}, package-a (>= 1.0.0)
 Description: Sample package to illustrate deb build process 
  Prints out a test message.
