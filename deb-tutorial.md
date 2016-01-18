@@ -1,7 +1,7 @@
 Debian Packaging Tutorial
 =========================
 
-This very quick walk-through borrows from the "Hello World" build example published [here](https://wiki.debian.org/BuildingTutorial#Introduction).
+This walk-through borrows from the "Hello World" build example published [here](https://wiki.debian.org/BuildingTutorial#Introduction).
 
 We employ a Dockerfile based on `ubuntu:trusty`.  This is pre-installed with everything you need to; build the sample Debian package, create an [Aptly](http://www.aptly.info/) repo, deploy the package to the repo, and install it from the repo.
 
@@ -62,11 +62,20 @@ Now we have a package, we would like to deploy it to a repo and then install it 
 
 The next few steps serve as a quick primer on using Aptly for this purpose.
 
-First we use Aptly to create our repo.
+First we use Aptly to create our repo.  We can validate its existence with `aptly repo list`.
     
-    # aptly repo create -distribution=testing -component=main a4pizza-testing
+```    
+# aptly repo create -distribution=testing -component=main a4pizza-testing
+# aptly repo list
+List of local repos:
+ * [a4pizza-testing] (packages: 0)
+
+To get more information about local repository, run `aptly repo show <name>`.
+```
     
-Note that the repo, itself is called "a4pizza-testing".  The distribution, however, is called "testing".  There may be other distributions such as "unstable" and "stable" - these would set up in the same way with another Aptly repo (note that in APT terms, however, several distributions such as "testing", "unstable" and "stable" would be considered distributions under the same *APT* repo.  Under the "testing" distribution there is just the single component called "main".
+Note that the *repo*, itself is called "a4pizza-testing".  The *distribution*, importantly, is called "testing".  There may be other distributions such as "unstable" and "stable" - these would set up in the same way with another Aptly repo (note that in APT terms, however, several distributions such as "testing", "unstable" and "stable" would be considered distributions under the *same APT* repo).  
+
+Finally, just note that under the "testing" distribution there is just the single component called "main".  APT uses the term component to mean a subdivisin of a distribution, such as "contrib" or "non-free".
     
 We can now add the package we just built into the Aptly repo.
 
@@ -76,7 +85,7 @@ And then we need to publish the repo we created.
 
     # aptly -architectures=all,amd64 publish repo --skip-signing=true a4pizza-testing
 
-We can now tell Aptly to act as a server for this repo; the default port is `8080`.
+We can now tell Aptly to act as a server for this published repo; the default port is `8080`.
     
     # aptly serve &    
 
@@ -119,11 +128,11 @@ We should now find that the package is gone from the repo.
 Releasing a New Version
 ======================
     
-First let's make a change to the hello-world shell script; for example:
+First let's make a change to the package-a shell script; for example:
 
 ```bash
 #!/bin/sh
-echo "Hello there 2!"
+echo "Hello from package-a v2!"
 ```
 
     
@@ -133,78 +142,79 @@ Update the file `debian\changelog`.  There is a tool for doing this `dch`.  For 
     
 Following the changelog update, we need to rebuild the package:
 
-    # cd /root/src/hello-world    
+    # cd /root/src/package-a    
     # dpkg-buildpackage
     
 This will build the new version of the `.deb` package which we will now add to the repo as follows:
 
-    # aptly repo add acme /root/src/hello-world_2.0.0_all.deb
+    # aptly repo add a4pizza-testing /root/src/package-a_2.0.0_all.deb
     
 Aptly now requires us to re-publish or update the repo.
 
     # aptly -architectures=amd64 publish update --skip-signing=true testing
     
-We can now do an `apt-get update` and then check using `apt-get install -s` to just see whether it thinks there is actually a new version of `hello-world` to upgrade to.  The `-s` means that only a simulation is done; no action is taken but it prints out what would happen if you removed the `-s`:
+We can now do an `apt update` and then check using `apt-get install -s` to just see whether it thinks there is actually a new version of `package-a` to upgrade to.  The `-s` means that only a simulation is done; no action is taken but it prints out what would happen if you removed the `-s`:
 
 ```
-# apt-get update && apt-get install -s hello-world
+# apt-get update && apt-get install -s package-a
 Reading package lists... Done
 Building dependency tree       
 Reading state information... Done
 The following packages will be upgraded:
-  hello-world
-1 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
-Inst hello-world [1.0.0] (2.0.0 . testing:testing [all])
-Conf hello-world (2.0.0 . testing:testing [all])
+  package-a
+1 upgraded, 0 newly installed, 0 to remove and 10 not upgraded.
+Inst package-a [1.0.0] (2.0.0 . testing:testing [all])
+Conf package-a (2.0.0 . testing:testing [all])
 ```
 
 We can see from this that there is a version 2.0.0 to upgrade to. Now we can do the version upgrade for real and watch what happens:
 
 ```
-# apt-get install hello-world
+# apt-get install package-a
 Reading package lists... Done
 Building dependency tree       
 Reading state information... Done
 The following packages will be upgraded:
-  hello-world
-1 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
-Need to get 3844 B of archives.
+  package-a
+1 upgraded, 0 newly installed, 0 to remove and 10 not upgraded.
+Need to get 4048 B of archives.
 After this operation, 0 B of additional disk space will be used.
 WARNING: The following packages cannot be authenticated!
-  hello-world
+  package-a
 Install these packages without verification? [y/N] y
-Get:1 http://localhost:8080/ testing/main hello-world all 2.0.0 [3844 B]
-Fetched 3844 B in 0s (0 B/s)    
+Get:1 http://localhost:8080/ testing/main package-a all 2.0.0 [4048 B]
+Fetched 4048 B in 0s (0 B/s)  
 (Reading database ... 24813 files and directories currently installed.)
-Preparing to unpack .../hello-world_2.0.0_all.deb ...
-Unpacking hello-world (2.0.0) over (1.0.0) ...
+Preparing to unpack .../package-a_2.0.0_all.deb ...
+Unpacking package-a (2.0.0) over (1.0.0) ...
 Processing triggers for man-db (2.6.7.1-1ubuntu1) ...
-Setting up hello-world (2.0.0) ...
+Setting up package-a (2.0.0) ...
 ```
 
 Prove to ourselves that the upgrade happened:
 
-    # hello-world 
-    Hello there 2!
+    # package-a
+    Hello from package-a v2!
 
 Oops!  We made a terrible mistake and want to *downgrade* back to version 1.0.0.  Well first we can validate what versions there are available using `apt-cache`:
 
 ```
-# apt-cache showpkg hello-world
-Package: hello-world
+# apt-cache showpkg package-a
+Package: package-a
 Versions: 
 2.0.0 (/var/lib/apt/lists/localhost:8080_dists_testing_main_binary-amd64_Packages.gz) (/var/lib/dpkg/status)
  Description Language: 
                  File: /var/lib/apt/lists/localhost:8080_dists_testing_main_binary-amd64_Packages.gz
-                  MD5: 9b7c7112ac3c351a6af7df35a47c3514
+                  MD5: 122e12a8e05a99aa38e324a49f6fd934
 
 1.0.0 (/var/lib/apt/lists/localhost:8080_dists_testing_main_binary-amd64_Packages.gz)
  Description Language: 
                  File: /var/lib/apt/lists/localhost:8080_dists_testing_main_binary-amd64_Packages.gz
-                  MD5: 9b7c7112ac3c351a6af7df35a47c3514
+                  MD5: 122e12a8e05a99aa38e324a49f6fd934
 
 
 Reverse Depends: 
+  package-b,package-a 1.0.0
 Dependencies: 
 2.0.0 - 
 1.0.0 - 
@@ -218,39 +228,111 @@ We are now sure we want to revert back to version 1.0.0.  We do this using `apt-
      
     
 ```
-# sudo apt-get install hello-world=1.0.0
+# sudo apt-get install package-a=1.0.0
 Reading package lists... Done
 Building dependency tree       
 Reading state information... Done
 The following packages will be DOWNGRADED:
-  hello-world
-0 upgraded, 0 newly installed, 1 downgraded, 0 to remove and 5 not upgraded.
-Need to get 3780 B of archives.
+  package-a
+0 upgraded, 0 newly installed, 1 downgraded, 0 to remove and 10 not upgraded.
+Need to get 3952 B of archives.
 After this operation, 0 B of additional disk space will be used.
 Do you want to continue? [Y/n] 
 WARNING: The following packages cannot be authenticated!
-  hello-world
+  package-a
 Install these packages without verification? [y/N] y
-Get:1 http://localhost:8080/ testing/main hello-world all 1.0.0 [3780 B]
-Fetched 3780 B in 0s (0 B/s)    
-dpkg: warning: downgrading hello-world from 2.0.0 to 1.0.0
+Get:1 http://localhost:8080/ testing/main package-a all 1.0.0 [3952 B]
+Fetched 3952 B in 0s (0 B/s)  
+dpkg: warning: downgrading package-a from 2.0.0 to 1.0.0
 (Reading database ... 24813 files and directories currently installed.)
-Preparing to unpack .../hello-world_1.0.0_all.deb ...
-Unpacking hello-world (1.0.0) over (2.0.0) ...
+Preparing to unpack .../package-a_1.0.0_all.deb ...
+Unpacking package-a (1.0.0) over (2.0.0) ...
 Processing triggers for man-db (2.6.7.1-1ubuntu1) ...
-Setting up hello-world (1.0.0) ...
+Setting up package-a (1.0.0) ...
 ```
 
 Finally, we validate that the down-grade worked as expected.
 
-    # hello-world 
-    Hello there!
+    # package-a 
+    Hello from package-a!
 
 #A Simple Release Lifecycle
 
 This section outlines how the tools used above may also be used to implement a simple build/release lifecycle whereby changes merged into an integration repository are promoted to a release when they have been tested.
 
-    
+```
+# aptly snapshot create rel1 from repo a4pizza-testing
+
+Snapshot rel1 successfully created.
+You can run 'aptly publish snapshot rel1' to publish snapshot as Debian repository.
+``` 
+
+The snapshot we created is called `rel1`.  It is an immutable copy of the distribution we took the snapshot from.  We nee to publish the snapshot in order for anything to see it.  We do this as follows.
+
+```
+# aptly -architectures=all,amd64 -distribution=stable --skip-signing publish snapshot rel1               
+Loading packages...
+Generating metadata files and linking package files...
+Finalizing metadata files...
+
+Snapshot rel1 has been successfully published.
+Please setup your webserver to serve directory '/root/.aptly/public' with autoindexing.
+Now you can add following line to apt sources:
+  deb http://your-server/ stable main
+Don't forget to add your GPG key to apt with apt-key.
+
+You can also use `aptly serve` to publish your repositories over HTTP quickly.
+```
+
+If you serve out the Aptly repo now, you will see that there are two distributions; "testing" and "stable".  Note that "stable" will not receive any uploaded updates; it is serving out the immutable snapshot we took of "testing".
+
+```
+# aptly publish list
+Published repositories:
+  * ./stable [all, amd64] publishes {main: [rel1]: Snapshot from local repo [a4pizza-testing]}
+  * ./testing [all, amd64] publishes {main: [a4pizza-testing]}
+```
+
+Now imagine we want to repeat this process.  We have perhaps releaseed some more packages to the "testing" distribution and wish to promote once more to stable.  Using Aptly we perform the following tasks.
+
+* New packages already deployed to "testing"
+* Create new snapshot ("rel2")
+* Switch pulication of "stable" to the new snapshot.
+
+So first we create a new snapshot for "rel2".
+
+```
+# aptly snapshot create rel2 from repo a4pizza-testing
+
+Snapshot rel2 successfully created.
+You can run 'aptly publish snapshot rel2' to publish snapshot as Debian repository.
+
+# aptly snapshot list
+List of snapshots:
+ * [rel1]: Snapshot from local repo [a4pizza-testing]
+ * [rel2]: Snapshot from local repo [a4pizza-testing]
+
+To get more information about snapshot, run `aptly snapshot show <name>`.
+```
+
+Now, we want to publish "rel2" as the distribution "stable".  Any environment pointing at the "stable" distribution will then get our updates.  To do this you must use the Aptly command `aptly publish switch`.  We didn't need to do this the first time around because initially there was nothing publishing the "stable" release.  
+
+```
+# aptly -architectures=all,amd64 --skip-signing publish switch stable rel2     
+Loading packages...
+Generating metadata files and linking package files...
+Finalizing metadata files...
+Cleaning up prefix "." components main...
+
+Publish for snapshot ./stable [all, amd64] publishes {main: [rel2]: Snapshot from local repo [a4pizza-testing]} has been successfully switched to new snapshot.
+```
+As you can see from the output of this command, the publication of the "stable" release has now been *switched* over from the "rel1" snapshot to the "rel2" snapshot.
+
+Any environment that is configured with the "stable" distribution will now receive the updates when it does an `apt-get update && apt-get install`.
+
+One benefit of doing things this way is that there has been no need to copy any files.
+
+
 Details 
 ========
 
