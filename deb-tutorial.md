@@ -1,7 +1,6 @@
 Debian Packaging Tutorial
 =========================
-
-This walk-through borrows from the "Hello World" build example published [here](https://wiki.debian.org/BuildingTutorial#Introduction).
+The purpose of this tutorial is to provide a starting point for those interested in building and releasing software through the Debian package mangement system.
 
 The tutorial walks through the following concepts.
 
@@ -11,18 +10,18 @@ The tutorial walks through the following concepts.
 * Upgrading `.deb` versions
 * Promoting packages between distributions using Aptly snapshots
 
-To save you effort, I have supplied a Dockerfile based on `ubuntu:trusty`.  If you have the Docker tools installed - this is the easiest way to go.  The supplied Dockerfile creates an image pre-installed with all the required tools.  Build the Docker image as follows:
+To save you some effort, I have supplied a Dockerfile based on `ubuntu:trusty`.  If you have the [Docker](https://www.docker.com/) tools installed - this is the easiest way to go.  The supplied Dockerfile allows you to create an image pre-installed with all the required tools.  Build the Docker image as follows:
 
     # docker build -t deb-build . 
     
-To run a container from the image
+To run a container from this image
     
     # docker run -ti \
         -p 8080:8080 \
         deb-build \
         bash
 
-Adding the port mapping (`-p 8080:8080`) in the above command is optional - it allows us to browse the aptly repo we will set up later.  
+Adding the port mapping (`-p 8080:8080`) in the above command is optional - it allows us to browse the Aptly repo we will set up later.  
 
 ##Building the Debian Package
 
@@ -462,6 +461,12 @@ For outside the Docker container, you may use the mapped port to access your rep
 
     # curl http://192.168.99.100:8080/
     
-The IP address will depend on the IP of your Docker host.    
+The IP address will depend on the IP of your Docker host.   
+
+#References
+
+This walk-through owes some thanks to the "Hello World" build example published [here](https://wiki.debian.org/BuildingTutorial#Introduction).
+
+ 
     
 
