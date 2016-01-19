@@ -3,27 +3,64 @@ Debian Packaging Tutorial
 
 This walk-through borrows from the "Hello World" build example published [here](https://wiki.debian.org/BuildingTutorial#Introduction).
 
-We employ a Dockerfile based on `ubuntu:trusty`.  This is pre-installed with everything you need to; build the sample Debian package, create an [Aptly](http://www.aptly.info/) repo, deploy the package to the repo, and install it from the repo.
+The tutorial walks through the following concepts.
+
+* Simple `.deb` build using `dpkg-deb`
+* More complex `.deb` build using `dpkg-buldpackage`
+* Hosting Debian packages with Aptly
+* Upgrading `.deb` versions
+* Promoting packages between distributions using Aptly snapshots
+
+To save you effort, I have supplied a Dockerfile based on `ubuntu:trusty`.  If you have the Docker tools installed - this is the easiest way to go.  The supplied Dockerfile creates an image pre-installed with all the required tools.  Build the Docker image as follows:
 
     # docker build -t deb-build . 
     
-To run a container    
+To run a container from the image
     
     # docker run -ti \
         -p 8080:8080 \
+        deb-build \
         bash
 
 Adding the port mapping (`-p 8080:8080`) in the above command is optional - it allows us to browse the aptly repo we will set up later.  
 
-##Building the Package
+##Building the Debian Package
 
-The first few steps take you through building a package from source.  First let's examine the sample source package in the directory `/root/src`.
+These first first steps take you through building a package from source.  There are two methods explained here; the first one `package-a` using the low-level `dpkg-deb` tool, the second, `package-b` using the more involved Makefile-like approach using the tool `dpkg-buildpackage`.
 
-    # cd /root/src/package-a    
-    # tree 
+###package-a: Simple build using `dpkg-deb`
+
+This first packaging example is about as simple as it gets.  The source for `package-a` just includes a simple executable shell script.  The only other thing needed is the `debian/control` file.  
+
+```bash
+# cd /root/src/
+# tree package-a
+package-a
+|-- debian
+|   `-- control
+`-- usr
+    `-- bin
+        `-- package-a
+```
+Notice that the executable shell script is in the relative location `package-a/usr/bin/`; this maps to its eventual target location. 
+
+The package archive is created using the low level Debian packagin tool `dpkg-deb`.
+
+```        
+# dpkg-deb --build package-a/ build/
+dpkg-deb: building package `package-a' in `build//package-a_1.0.0_all.deb'.
+```
+The first argument is the package we're creating the archive for.  The second argument is the target directory where the `.deb` file will be created.
+
+###package-b: More complex build using `dpkg-buildpackage`
+
+This second example allows for more bells and whistles in the build process but also involves a slightly different file structure and more files.
+
+    # cd /root/src    
+    # tree /package-b 
     
 ```
-.
+package-b
 |-- debian
 |   |-- README
 |   |-- changelog
@@ -31,17 +68,19 @@ The first few steps take you through building a package from source.  First let'
 |   |-- control
 |   |-- copyright
 |   |-- dirs
-|   |-- package-a.manpages
-|   |-- package-a.pod
+|   |-- files
 |   |-- install
+|   |-- package-b.manpages
+|   |-- package-b.pod
 |   |-- rules
 |   `-- source
 |       `-- format
-`-- package-a
+`-- package-b
 ```
 
-The stuff in the debian directory is all about building the package.  The `package-a` shell script is what will actually be installed.  In this directory we can now build the Debian package as follows:
+The stuff in the debian directory is all about building the package.  The `package-b` shell script is what will actually be installed.  In this directory we can now build the Debian package as follows:
     
+    # cd /root/src/package-b
     # dpkg-buildpackage
     
 The man page will tell you what `dpkg-buildpackage` does exactly but note that one of the steps is to call `debian/rules`.  The [rules](http://www.debian.org/doc/manuals/maint-guide/dreq.en.html#rules) file is actually a Makefile.  The rules file uses the tool `dh` (part of the `debhelper` tool suite).
@@ -97,7 +136,7 @@ Importantly, note that we're using the distribution name "testing" here.
 
 We are now ready to update the `apt` index and then install the package using `apt`.
 
-    # apt update && apt install package-a    
+    # apt-get update && apt-get install package-a    
     # package-a 
     Hello from package-a!
     
@@ -114,11 +153,11 @@ Then remove from the Aptly repo and re-publish.
     
 Then we update the `apt` cache.
     
-    # apt update 
+    # apt-get update 
 
 We should now find that the package is gone from the repo.
 
-    # apt install package-a
+    # apt-get install package-a
     Reading package lists... Done
     Building dependency tree       
     Reading state information... Done
@@ -128,13 +167,31 @@ We should now find that the package is gone from the repo.
 Releasing a New Version
 ======================
     
-First let's make a change to the package-a shell script; for example:
+First let's make a change to the `package-a` shell script; for example:
+
+###package-a: Using `dpkg-deb`
 
 ```bash
 #!/bin/sh
 echo "Hello from package-a v2!"
 ```
+Now edit the `debian/control` file directly and change the Version field.
 
+```
+    Version: 2.0.0
+```
+
+Re-build using `dpkg-deb`.
+
+    # cd /root/src/
+    # dpkg-deb --build package-a/ build/
+    
+###package-b: Using `dpkg-buildpackage`
+
+```bash
+#!/bin/sh
+echo "Hello from package-b v2!"
+```
     
 Update the file `debian\changelog`.  There is a tool for doing this `dch`.  For example, to release a version 2.0.0:    
 
@@ -145,15 +202,17 @@ Following the changelog update, we need to rebuild the package:
     # cd /root/src/package-a    
     # dpkg-buildpackage
     
-This will build the new version of the `.deb` package which we will now add to the repo as follows:
+###Adding the new `.deb` to the repo
+    
+Regardless of the method used we will now have the new version of the `.deb` package which we can add to the Aptly repo as follows:
 
-    # aptly repo add a4pizza-testing /root/src/package-a_2.0.0_all.deb
+    # aptly repo add a4pizza-testing package-a_2.0.0_all.deb
     
 Aptly now requires us to re-publish or update the repo.
 
     # aptly -architectures=amd64 publish update --skip-signing=true testing
     
-We can now do an `apt update` and then check using `apt-get install -s` to just see whether it thinks there is actually a new version of `package-a` to upgrade to.  The `-s` means that only a simulation is done; no action is taken but it prints out what would happen if you removed the `-s`:
+We can now do an `apt-get update` and then check using `apt-get install -s` to just see whether it thinks there is actually a new version of `package-a` to upgrade to.  The `-s` means that only a simulation is done; no action is taken but it prints out what would happen if you removed the `-s`:
 
 ```
 # apt-get update && apt-get install -s package-a

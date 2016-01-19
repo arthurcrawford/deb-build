@@ -1,0 +1,10 @@
+build/
+src/package-b/debian/files
+src/package-b/debian/package-b.1
+src/package-b/debian/package-b.debhelper.log
+src/package-b/debian/package-b.substvars
+src/package-b/debian/package-b/
+src/package-b_1.0.0.dsc
+src/package-b_1.0.0.tar.gz
+src/package-b_1.0.0_all.deb
+src/package-b_1.0.0_amd64.changes
