@@ -391,10 +391,10 @@ Any environment that is configured with the "stable" distribution will now recei
 One benefit of doing things this way is that there has been no need to copy any files.
 
 
-Details 
+Aptly Notes 
 ========
 
-Inspect the repo you created.
+To inspect the repo you created.
 
 ```    
 # aptly repo list
@@ -404,7 +404,7 @@ List of local repos:
 To get more information about local repository, run `aptly repo show <name>`.
 ```
 
-See how aptly stores the local repo configuration:
+To see how aptly stores the local repo configuration:
     
     $ cat  ~/.aptly.conf 
     
