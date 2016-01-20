@@ -199,7 +199,7 @@ echo "Hello from package-a v2!"
 Now edit the `debian/control` file directly and change the Version field.
 
 ```
-    Version: 2.0.0
+Version: 2.0.0
 ```
 
 Re-build using `dpkg-deb`.
@@ -211,7 +211,7 @@ Re-build using `dpkg-deb`.
 
 ```bash
 #!/bin/sh
-echo "Hello from package-b v2!"
+echo "Hello from package-a v2!"
 ```
     
 Update the file `debian\changelog`.  There is a tool for doing this `dch`.  For example, to release a version 2.0.0:    
@@ -220,7 +220,7 @@ Update the file `debian\changelog`.  There is a tool for doing this `dch`.  For 
     
 Following the changelog update, we need to rebuild the package:
 
-    # cd /root/src/package-a    
+    # cd /root/src/package-b    
     # dpkg-buildpackage
     
 ###Adding the new `.deb` to the repo
@@ -341,13 +341,13 @@ Finally, we validate that the down-grade worked as expected.
 This section outlines how the tools used above may also be used to implement a simple build/release lifecycle whereby changes merged into an integration repository are promoted to a release when they have been tested.
 
 ```
-# aptly snapshot create rel1 from repo a4pizza-testing
+# aptly snapshot create testing-rel1 from repo a4pizza-testing
 
 Snapshot rel1 successfully created.
 You can run 'aptly publish snapshot rel1' to publish snapshot as Debian repository.
 ``` 
 
-The snapshot we created is called `rel1`.  It is an immutable copy of the distribution we took the snapshot from.  We nee to publish the snapshot in order for anything to see it.  We do this as follows.
+The snapshot we created is called `testing-rel1`.  It is an immutable copy of the distribution we took the snapshot from.  We nee to publish the snapshot in order for anything to see it.  We do this as follows.
 
 ```
 # aptly -architectures=all,amd64 -distribution=stable --skip-signing publish snapshot rel1               
@@ -411,6 +411,83 @@ As you can see from the output of this command, the publication of the "stable" 
 Any environment that is configured with the "stable" distribution will now receive the updates when it does an `apt-get update && apt-get install`.
 
 One benefit of doing things this way is that there has been no need to copy any files.
+
+###Filtering and merging snapshots
+Now consider that we want to prepare a destination snapshot that contains a subset of packages from the source snapshot.  We may want to do this if we want to create a release snapshot with just the changed packages.
+
+We first need to understnad Aptly's filtering.  
+
+The following command shows examples of filter terms.  The command shows packages in the source snapshot `testing-rel1` that match the query term.
+
+```
+# aptly snapshot search testing-rel1 'Name (% pack*)'
+package-b_1.0.0_all
+package-a_1.0.0_all
+# aptly snapshot search testing-rel1 'Name (package-b)'
+package-b_1.0.0_all
+```
+
+We can use the same filtering technique to create a subset destination snapshot from a source snapshot.  The following series of commands show just that.  We create a destination subset `testing-rel1-subset` snapshot containing only the package with the name `package-b` from the source snapshot `testing-rel1`.
+
+```
+# aptly snapshot filter testing-rel1 testing-rel1-subset 'Name (package-b)'
+Loading packages (2)...
+Building indexes...
+
+Snapshot testing-rel1-subset successfully filtered.
+You can run 'aptly publish snapshot testing-rel1-subset' to publish snapshot as Debian repository.
+```
+
+We then validate what we have done by running a search query on both the source snapshot and the destination snapshot.
+
+```
+# aptly snapshot search testing-rel1-subset 'Name (% *)'
+package-b_1.0.0_all
+
+# aptly snapshot search testing-rel1 'Name (% *)'
+package-b_1.0.0_all
+package-a_1.0.0_all
+```
+
+We can also do this directly using Aptly's snapshot diff command.
+
+```
+# aptly snapshot diff testing-rel1 testing-rel1-subset
+  Arch   | Package                                  | Version in A                             | Version in B
+- all    | package-a                                | 1.0.0                                    | -              
+```
+
+What this shows us is that the source snapshot ('Version in A' - i.e. left-hand term) contains the additional `package-a` which is lacking from the destination snapshot ('Version in B' - i.e. right-hand term).
+
+Finally in our workflow, we would like to create a merged snapshot.  The use case would be creating a snapshot which is a merge of all packages in the Stable distribution plus new packages intended for release.  We can use this merged snapshot as our release candidate.
+
+As a contrived example, we can create another subset snapshot containing just package-a.
+
+```
+# aptly snapshot filter testing-rel1 testing-rel2-subset 'Name (package-a)'
+
+# aptly snapshot search testing-rel2-subset 'Name (% package*)'
+package-a_1.0.0_all
+```
+
+And now we can merge together the snapshot containing package-a `testing-rel2-subset` with the snapshot containing package-b `testing-rel1-subset` to create the final destination snapshot `release-candidate` which will be our release candidate.
+
+```
+# aptly snapshot merge release-candidate testing-rel2-subset testing-rel1-subset
+
+Snapshot release-candidate successfully created.
+You can run 'aptly publish snapshot release-candidate' to publish snapshot as Debian repository.
+```
+
+We can prove the merge worked by searching for all packages in the destination snapshot of the merge.
+
+```
+# aptly snapshot search release-candidate 'Name (% *)'
+package-a_1.0.0_all
+package-b_1.0.0_all
+```
+
+Finally, we can publish this.
 
 
 Aptly Notes 
