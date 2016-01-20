@@ -35,7 +35,7 @@ This first packaging example is about as simple as it gets.  The source for `pac
 # cd /root/src/
 # tree package-a
 package-a
-|-- debian
+|-- DEBIAN
 |   `-- control
 `-- usr
     `-- bin
@@ -46,8 +46,8 @@ Notice that the executable shell script is in the relative location `package-a/u
 The package archive is created using the low level Debian packagin tool `dpkg-deb`.
 
 ```        
-# dpkg-deb --build package-a/ build/
-dpkg-deb: building package `package-a' in `build//package-a_1.0.0_all.deb'.
+# dpkg-deb --build package-a/ build
+dpkg-deb: building package `package-a' in `build/package-a_1.0.0_all.deb'.
 ```
 The first argument is the package we're creating the archive for.  The second argument is the target directory where the `.deb` file will be created.
 
