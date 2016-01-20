@@ -18,10 +18,11 @@ To run a container from this image
     
     # docker run -ti \
         -p 8080:8080 \
+        -w /root/src \
         deb-build \
         bash
 
-Adding the port mapping (`-p 8080:8080`) in the above command is optional - it allows us to browse the Aptly repo we will set up later.  
+Adding the port mapping (`-p 8080:8080`) in the above command is optional - it allows us to browse the Aptly repo we will set up later.  The `-w` argument puts you in the right starting directory inside the container.
 
 ##Building the Debian Package
 
@@ -32,7 +33,6 @@ These first first steps take you through building a package from source.  There 
 This first packaging example is about as simple as it gets.  The source for `package-a` just includes a simple executable shell script.  The only other thing needed is the `debian/control` file.  
 
 ```bash
-# cd /root/src/
 # tree package-a
 package-a
 |-- DEBIAN
@@ -50,6 +50,18 @@ The package archive is created using the low level Debian packagin tool `dpkg-de
 dpkg-deb: building package `package-a' in `build/package-a_1.0.0_all.deb'.
 ```
 The first argument is the package we're creating the archive for.  The second argument is the target directory where the `.deb` file will be created.
+
+You can examine the contents of the built package using `dpkg`.
+
+```bash
+# dpkg -c build/package-a_1.0.0_all.deb
+drwxr-xr-x root/root         0 2016-01-20 12:02 ./
+drwxr-xr-x root/root         0 2016-01-19 08:28 ./usr/
+drwxr-xr-x root/root         0 2016-01-19 08:55 ./usr/bin/
+-rwxr-xr-x root/root        42 2016-01-19 08:55 ./usr/bin/package-a    
+```
+
+Pretty simple!  When you install this package, the shell script `package-a` will be installed in the directory `/usr/bin`.  At its simplest, that's all there is to it.
 
 ###package-b: More complex build using `dpkg-buildpackage`
 
@@ -100,10 +112,15 @@ Now we have a package, we would like to deploy it to a repo and then install it 
 
 The next few steps serve as a quick primer on using Aptly for this purpose.
 
-First we use Aptly to create our repo.  We can validate its existence with `aptly repo list`.
+First we use Aptly to create our repo.  
     
 ```    
 # aptly repo create -distribution=testing -component=main a4pizza-testing
+```
+
+We can validate its existence with `aptly repo list`.
+
+```
 # aptly repo list
 List of local repos:
  * [a4pizza-testing] (packages: 0)
@@ -111,31 +128,36 @@ List of local repos:
 To get more information about local repository, run `aptly repo show <name>`.
 ```
     
-Note that the *repo*, itself is called "a4pizza-testing".  The *distribution*, importantly, is called "testing".  There may be other distributions such as "unstable" and "stable" - these would set up in the same way with another Aptly repo (note that in APT terms, however, several distributions such as "testing", "unstable" and "stable" would be considered distributions under the *same APT* repo).  
+Note that the Aptly "repo", itself is called "a4pizza-testing".  The APT distribution, on the other hand, is what will subsequently be published and its called "testing".  The latter is what the APT client will see.
 
-Finally, just note that under the "testing" distribution there is just the single component called "main".  APT uses the term component to mean a subdivisin of a distribution, such as "contrib" or "non-free".
+Finally, just note that under the "testing" distribution there is just the single component called "main".  Debian/APT uses the term component to mean a subdivisin of a distribution, such as "main" or "contrib" or "non-free".  This has a specific meaning in Debian distributions - for instance, all packages in the "non-free" component require licensing whereas all packages in "main" are open-source.  For our purposes however, since we are using Debian to package our own software, we may just restrict ourselves to use of a single component - e.g. "main".
     
 We can now add the package we just built into the Aptly repo.
 
-    # aptly repo add a4pizza-testing /root/src/package-a_1.0.0_all.deb        
+```
+# aptly repo add a4pizza-testing build/package-a_1.0.0_all.deb
+Loading packages...
+[+] package-a_1.0.0_all added        
+```
 
-And then we need to publish the repo we created.
+An Aptly "repo" is really just a logical area of its file storage - we have associated it with the distribution "testing" but as yet nothing is visible until it is published.  So we now need to publish the repo we just created.
 
     # aptly -architectures=all,amd64 publish repo --skip-signing=true a4pizza-testing
 
-We can now tell Aptly to act as a server for this published repo; the default port is `8080`.
+We can Aptly's embedded HTTP server to serve out its published repos; the default port is `8080`.
     
     # aptly serve &    
 
-The new Aptly repo must be added to your list of sources so that `apt` will be able to search it for our new package.
+For your APT client to see anything, the new Aptly repo must be added to your list of APT sources so that `apt-get` will be able to search it for our new packag.
 
     # echo "deb http://localhost:8080/ testing main" >> /etc/apt/sources.list
     
-Importantly, note that we're using the distribution name "testing" here.       
+Importantly, note that we're using the *distribution* name "testing" here.  The distribution is the thing APT understands.
 
-We are now ready to update the `apt` index and then install the package using `apt`.
+We are now ready to update the `apt` index and then install the package using `apt-get`.
 
-    # apt-get update && apt-get install package-a    
+    # apt-get update 
+    # apt-get install package-a    
     # package-a 
     Hello from package-a!
     
