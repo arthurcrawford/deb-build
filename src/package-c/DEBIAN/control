@@ -1,0 +1,6 @@
+Package: package-c
+Version: 1.0.0
+Maintainer: Art Crawford <art@a4pizza.com>
+Description: Sample package to illustrate deb build process 
+ Prints out a test message.
+Architecture: all
