@@ -39,7 +39,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/root/src/package-c/opt/package-c/env"
+VIRTUAL_ENV="/opt/package-c/env"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
