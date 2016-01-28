@@ -90,11 +90,9 @@ Published repositories:
   * ./unstable [all, amd64] publishes {main: [a4pizza/legacy]}
 ```	
 
-# Using the APT repo
-
-Now to act as a client of the APT repo we have created.  Before we can use the Aptly repo as an APT repository we need to host it.  You can do this with the Aptly embedded server.
-
 ### Serve repo
+
+Before anyone can use the Aptly repo as an APT repository we need to host it.  You can do this with the Aptly embedded server.
 
     # aptly serve &	
 
@@ -109,12 +107,39 @@ This will allow us to examine the published distributions at the following URL.
 </pre>
 	
 This reveals the expected three distributions; unstable, testing and stable.  Following the initial setup, all distributions serve out the exact same set of packages in the pool.  
+
+#Using the APT repo
+
+Now to act as a client of the APT repo we have created.  
+
+###Create an integration environment
+
+We can set up a linked Docker container to act as our integration environment.  
+
+```bash
+docker run -ti --rm \
+    -w /root/src \
+    --link repo:repo \
+    --name int \
+    deb-build bash
+```
+
+By using the `--link repo:repo` argument, Docker adds a link to the named `repo` container, adding it to the `/etc/hosts`, so that we can access the web port of `repo`.
     	 
-### Configure APT client to point to the 'stable' distribution
+    # curl http://repo:8080/dists/
+    
+<pre>
+<a href="stable/">stable/</a>
+<a href="testing/">testing/</a>
+<a href="unstable/">unstable/</a>
+</pre>
+    	 
+    	 
+###Configure APT client to point to the 'unstable' distribution
 
-If we want to build an environment based on the stable distribution we configure our host's APT config.
+If we want to build an environment based on the unstable distribution we configure our host's APT config.
 
-    # echo "deb http://localhost:8080/ stable main" >> /etc/apt/sources.list	 
+    # echo "deb http://repo:8080/ unstable main" >> /etc/apt/sources.list	 
 	
 ### Update APT	
 
@@ -124,6 +149,18 @@ If we want to build an environment based on the stable distribution we configure
 
     # apt-get install package-a
 	
+#Making A New Release	
+
+We now go through a simple scenario of the release of a new version of a package.
+
+###Deploy New Package Version
+The fist step in our imagined lifecycle is to modify the package and deploy a new version to the `unstable` distribution.  
+
+Now that it is available in our `unstable` distribution, it is available to our assumed continuous integration or nightly build processes.  Assuming such an integration / nightly build process is successful, we now want to make the new package available in the next logical environment we will cal this environment `QA/int` and it will be pointed at the `testing` distribution.  
+
+So the next stage is to *release* our new package to testing.  The intention is that QA want to test an environment that is built from a repository that represents the current *production* environment plus the new package.  We need to test that combination to ensure that the release of the new package will not break production.  So we need to create a new testing snapshot which is composed of stable+new package.  We can use Aptly's snapshotting mechanism for this.
+
+
 
 
 		
