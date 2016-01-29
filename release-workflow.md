@@ -1,29 +1,74 @@
+# Cloud APT repo structure
+
+The following APT repo structure is currently in use by the cloud orchestration development stream but is not under any release process.
+
+```bash
 apt/common
-
 apt/zonza
-
-# Legacy structure
-apt/zonza/legacy
-apt/zonza/legacy/unstable
-apt/zonza/legacy/testing
-apt/zonza/legacy/stable
-
-
-[Upstream]  (checks ==>) unstable (nightly ==>) testing (QA ==>) acceptance  (OAT/UAT  ==>) stable
-                         ========               =======          ..........                 ======
-                            |                      |                 |                        |
-						  [ci]                   [int]              [pp]                     [p]
-						  
-
-# Cloud structure
 apt/zonza/zonza4
 apt/zonza/zonza4/dev
 apt/zonza/zonza4/ci
 apt/zonza/zonza4/test
-
 apt/zonza/zonza5
+[...]
+```
+
+# Legacy structure
+
+The following APT repo structure will be put in place to align with current release process and will allow for a break-out from the current manual, file-based, dependency-management.
+
+```bash
+[...]
+apt/zonza/legacy
+apt/zonza/legacy/unstable
+apt/zonza/legacy/testing
+apt/zonza/legacy/stable
+```
+
+When tested in the current release process, the two schemes will be brought in line so that new releases to legacy repos are also made available to cloud environments.
+
+The repo promotion scheme as it relates to the release management process.
+
+```bash
+
+[Upstream]  
+    ↓
+    
+(checks) 
+    ↓
+    
+ deploy   
+    ↓
 
 
+ unstable  →  testing   →  (acceptance)  →  stable      (APT repos)
+ ========     =======       ..........      ======
+    ↓            ↓             ↓              ↓
+  [ci]         [int]          [pp]           [p]        (Environments)
+```
+
+
+The following definitions apply to the APT distributions named above.
+
+* **unstable** - [Permanent] - constantly changing; moving head of release-ready changes.  Backed by continuous integration testing / nightly builds.
+* **testing** - [Permanent] - changes periodically at every release/test cycle.  testing is the next release candidate.
+* *(acceptance)* - [Flyweight] used only for validation of the release candidate in prod-like environment. Torn down after use.
+* **stable** - [Permanent] - changes at every successful release.  Latest, stable code.
+
+N.B. in the above scheme *acceptance* is a special case distribution as it relates to the release process.
+
+The lifecycle of a package is defined by the following steps.
+
+* **deploy** package(s):
+   package(s) now available to be released   
+* **make-release** {release_id}
+   package(s) incorporated into release candidate (uniquely identified by release id) and made available for QA
+* **release-to-acceptance** {release_id}
+   release candidate made available for acceptance 
+* **release-to-stable** {release_id}
+   release candidate made available for production
+   
+**N.B.** in a ticket-driven release process, the `release_id` can be the release ticket number.   
 
 
 #Initial Repo Setup
