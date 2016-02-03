@@ -1,4 +1,4 @@
-all: package 
+all: clean package 
 
 # Move files into build area
 prepare:
