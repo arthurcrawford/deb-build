@@ -1,6 +1,6 @@
 all: package 
 
-# Move files into build area
+# Move files into build area
 prepare:
 	mkdir -p build/package-c/opt/package-c
 	cp -R DEBIAN build/package-c
@@ -11,9 +11,11 @@ venv: prepare
 	cd build/package-c/opt/package-c; \
 	virtualenv env
 
-# Install python dependencies from PyPi using pip
+# Install python dependencies from PyPi using pip
 deps: venv
 	./make-deps.sh
+	virtualenv --relocatable build/package-c/opt/package-c/env
+	sed -i s_/root/src/package-c/build/package-c/_/_ build/package-c/opt/package-c/env/bin/activate*
 
 # "build" our software into the virtual env (i.e. copy python script into place)
 build: deps
