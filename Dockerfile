@@ -29,10 +29,10 @@ RUN apt-get update && apt-get install -y \
     quilt \
     curl \
     wget \
-    tree 
+    tree \
+    python-virtualenv
+
 ADD src /root/src
-# Remember to add back config to /etc/apt/sources.list
-RUN mv /etc/apt/sources.list /etc/apt/sources.list.bak
 # GPG secret key pass-phrase = pizza
 RUN gpg --import /root/src/public.pizza.gpg
 RUN gpg --import /root/src/secret.pizza.gpg
