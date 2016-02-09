@@ -4,7 +4,7 @@ release-to-acceptance ()
 {
     export RELEASE_ID=$1
 
-    # Re-publish testing 
+    # Re-publish acceptance 
     aptly -architectures=all,amd64 --skip-signing publish switch acceptance snap-rc-$RELEASE_ID
 }
 
